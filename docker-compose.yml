@@ -30,5 +30,22 @@ services:
       HERMES_API_TIMEOUT: "1800"    # local models are slow
     volumes:
       - ./data/instances/dev:/opt/data
+      - ./hermes/scripts:/opt/platform/scripts:ro   # e.g. kokoro_tts.sh (Telegram voice replies)
     labels:
       platform.instance: dev
+
+  # Local speech-to-text (OpenAI-compatible Whisper server, CPU).
+  # Hermes's official image ships no STT engine, so Hermes calls this instead:
+  # stt.provider=openai + STT_OPENAI_BASE_URL=http://127.0.0.1:8000/v1
+  stt:
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
+    container_name: speaches
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data/speaches:/home/ubuntu/.cache/huggingface/hub
+    environment:
+      WHISPER__COMPUTE_TYPE: int8   # ~2-3x faster on CPU, same transcripts in practice
+      WHISPER__CPU_THREADS: "8"
+      WHISPER__TTL: "-1"            # keep the voice model loaded (default unloads after 5 min idle)

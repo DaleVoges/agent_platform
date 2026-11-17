@@ -41,10 +41,10 @@ Options for the voice front, cheapest-to-build first:
    Or a speech-to-speech model (OpenAI Realtime / Gemini Live) as the front, still calling Hermes as a tool.
 
 ### Voice milestones
-- [ ] V1: Hermes replies with voice on Telegram (config only: `tts.provider`, STT key)
+- [x] V1: Hermes replies with voice on Telegram (Speaches Whisper STT + Edge TTS)
 - [ ] V2: Outbound calls via the `telephony` skill (Twilio + Vapi) — "call the dentist and book Tuesday"
-- [ ] V3: `apps/voice` service (Pipecat): browser push-to-talk → Jarvis → Hermes
-- [ ] V4: Inbound phone line: Twilio number → Pipecat → Jarvis, caller ID → user lookup
+- [x] V3: `apps/voice` service (Pipecat): browser voice → Jarvis (Gemma, thinking off) → Hermes in background
+- [~] V4: Phone line: Twilio number → Pipecat → Jarvis, in and out (`apps/voice/phone.py`); caller allowlist now, caller ID → user lookup later
 - [ ] V5: Outbound calls through our own pipeline (replace Vapi), call transcripts saved to Hermes memory
 - [ ] Safety: always confirm before dialing; never emergency numbers; per-plan minute limits; recording consent per region
 

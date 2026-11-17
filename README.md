@@ -45,6 +45,7 @@ scripts/instance.sh list
 | `scripts/instance.sh` | Manual multi-instance tool (precursor to the control plane) |
 | `deploy/fly/` | Fly.io template for one instance |
 | `data/instances/<name>/` | Each instance's `/opt/data` (config, keys, sessions, memory). Git-ignored. |
+| `apps/voice/` | Jarvis: real-time voice front (Pipecat) that hands tasks to Hermes |
 | `apps/` | Future: control-plane API + web UI |
 | `docs/ROADMAP.md` | Plan |
 
@@ -76,7 +77,42 @@ If the `ollama` systemd service crash-loops with `mkdir /usr/share/ollama: permi
 sudo install -d -o ollama -g ollama /usr/share/ollama && sudo systemctl restart ollama
 ```
 
-Optional, keeps the model loaded so replies stay fast: `Environment="OLLAMA_KEEP_ALIVE=24h"` in
-`/etc/systemd/system/ollama.service.d/override.conf`. The dev container uses host networking so it can
+Recommended on a 16 GB machine (keeps the model loaded, caps llama.cpp's 8 GB RAM prompt cache): add to
+`/etc/systemd/system/ollama.service.d/override.conf` under `[Service]`, then
+`sudo systemctl daemon-reload && sudo systemctl restart ollama`:
+
+```ini
+Environment="OLLAMA_KEEP_ALIVE=2h"
+Environment="LLAMA_ARG_CACHE_RAM=1024"
+Environment="LLAMA_ARG_CTX_CHECKPOINTS=4"
+``` The dev container uses host networking so it can
 reach Ollama on 127.0.0.1; `scripts/instance.sh` instances use bridge networking and need a hosted
 provider key (or Ollama reachable through the firewall).
+
+## Voice (Telegram voice notes)
+
+The official Hermes image has no speech-to-text engine, so `docker-compose.yml` runs **Speaches**
+(OpenAI-compatible Whisper server, CPU) on `127.0.0.1:8000`. One-time model download:
+
+```bash
+curl -X POST localhost:8000/v1/models/Systran/faster-whisper-small
+```
+
+Download the Kokoro voice model once as well:
+
+```bash
+curl -X POST localhost:8000/v1/models/speaches-ai/Kokoro-82M-v1.0-ONNX
+```
+
+Instance settings (`data/instances/dev/`):
+- `config.yaml`: `stt.provider: openai`, `stt.openai.model: Systran/faster-whisper-small`,
+  `voice.auto_tts: true` + `auto_tts_mode: voice_only`, and `tts.provider: kokoro`, a command provider running
+  `hermes/scripts/kokoro_tts.sh` (mounted at `/opt/platform/scripts`) (Speaches Kokoro `bm_daniel` 1.1x → ffmpeg → Ogg/Opus). Hermes 0.23.1's
+  built-in `openai` provider asks Speaches for Opus, which Speaches can't produce, so Telegram voice replies fail with it
+  with `command: "sh /opt/platform/scripts/kokoro_tts.sh {input_path} {output_path} bm_daniel 1.1"`,
+  `output_format: ogg`, `voice_compatible: true`
+- `.env`: `STT_OPENAI_BASE_URL=http://127.0.0.1:8000/v1`, `VOICE_TOOLS_OPENAI_KEY=<any non-empty value>`
+
+In Telegram, `/voice tts` makes it speak every reply; `/voice on` goes back to voice-notes-only.
+Hermes keeps running on the last valid `config.yaml` if you break it: check with
+`docker exec -u hermes hermes-dev hermes config check`.
